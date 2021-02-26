@@ -1,0 +1,144 @@
+#Name: Benjamin Malz
+#Filename: malzSPIM1.a
+#Purpose: This program will take up to 25 integers input by a user (between the range of 1-20) and calculate the mean, variance and display a graph of the frequency of the input numbers.
+#Input: The user must input up to 25 integers. If an integer is 0 or less, or greater than 20, input will cease. If not, input ceases at 25 integers regardless.
+#Output: The program will display the amount of integers inputted, mean of the inputted integers, variance of the integers and a graph showing how many times each integer was input.
+#-------------------------------------------------------------------
+	.data
+array:	.word	-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+newline:	.asciiz "\n"
+prompt:	.asciiz "Enter up to 25 integers between the range of 1 and 20. \n"
+completion:	.asciiz "\nThe program is complete."
+toomuch:	.asciiz "You entered a number above 20. No longer taking input.\n"
+totalnums:	.asciiz "\nThe total amount of numbers you entered is: "
+spacing:	.asciiz "    "
+avgtxt:	.asciiz "\nThe mean of all numbers is: "
+vartxt:	.asciiz "The variance is: "
+graphtxt:	.asciiz "\nGraph showing frequency of integers - a 0 represents one appearance in your list."
+#--------------------------------------------------------------------
+	.text
+	.globl main
+main:
+	li	$t0, 1	#increment of one
+	li	$t1, 4	#increment of four
+	li	$t2, 0	#max array position
+	li	$t3, 0	#holds 0 for comparison
+	li	$t4, 20	#holds 20 for comparison
+	li	$t5, 0	#number of items in the array
+	li	$t6, 25	#max length
+	li	$t7, 0	#start array pos
+	li	$a2, 0	#for graph
+	
+	li	$v0, 4
+	la	$a0, prompt
+	syscall	#display prompt for input
+	
+	
+inputLoop:	#takes the input until 25 numbers are input, or the input is 0 or below, or 21 and above
+	li	$v0, 5	#user inputs number
+	syscall	
+	move	$a1, $v0	#moves result to a1
+	blez	$a1, sum	#if the input is less than zero, move to rest of program
+	ble	$a1, $t4, addToArray	#if the input is less than 20, add to array
+	
+	li	$v0, 4
+	la	$a0, toomuch	#if this point in the loop is hit then the input is greater than 20
+	j	sum	#proceed to next part of program
+	
+addToArray:	#adds an input number to array
+	sw	$a1, array($t2)	#stores the input into the array
+	add	$t2, $t2, $t1	#increase array location
+	add	$t5, $t5, $t0	#increase number of items
+	bge	$t5, $t6, sum	#if at 25 items proceed to next step
+	j	inputLoop	#return to input
+
+
+graph:	#outer loop for graph, iterates the number by 1
+	li	$t7, 0	#reset array position
+	add	$a2, $a2, $t0	#increment number by 1
+	bgt	$a2, $t4, terminate	#stop if above 20
+	li	$v0, 4
+	la	$a0, newline	#newline
+	syscall
+	move	$a0, $a2
+	li	$v0, 1
+	syscall
+	li	$v0, 4
+	la	$a0, spacing	#print number and space
+	syscall
+	j	graphloop
+
+graphloop:	#inner loop, compares each array item to current number
+	bge	$t7, $t2, graph	#if at end of array move to next it
+	lw	$a3, array($t7)	#load current number into a3
+	beq	$a2, $a3, graphprint	#if current array number matches graph number, print
+	add	$t7, $t7, $t1	#otherwise increase array position
+	j 	graphloop	#loop
+
+graphprint:	#prints a 0 for the graph
+	li	$a0, 0
+	li	$v0, 1
+	syscall
+	add	$t7, $t7, $t1	#increase array position after printing
+	j	graphloop	#return to loop
+
+
+sum:	#adds up every number in array
+	li	$t7, 0	#reset array
+	li	$t4, 0	#stores sum
+	li	$v0, 4
+	la	$a0, totalnums	#display the total amount of numbers
+	syscall
+	move	$a0, $t5
+	li	$v0, 1
+	syscall
+sumloop:	#loop to add numbers
+	bge	$t7, $t2, avg
+	lw	$t3, array($t7)
+	add	$t4, $t3, $t4	#adds the new number to the sum
+	add	$t7, $t7, $t1	#move through array
+	j	sumloop	#loop through
+		
+avg:	#calculates the mean
+	li	$v0, 4
+	la	$a0, avgtxt
+	syscall
+	div	$t4, $t4, $t5	#divide the sum by the total amount of numbers
+	move	$a0, $t4	#print the average
+	li	$v0, 1
+	syscall
+	li	$v0, 4
+	la	$a0, newline
+	syscall
+	li	$t7, 0	#resetting array pointer for next section
+	li	$a1, 0	#resetting register for next section
+
+variance:	#calculates the variance before it is divided by the total amount of numbers
+	bge	$t7, $t2, continue	#if completely finished with array, proceed
+	lw	$a3, array($t7)	#load current array number into a3
+	sub	$a3, $a3, $t4	#subtract the mean from the current number, store in a3
+	mul	$a2, $a3, $a3	#square the number, store in a2
+	add	$a1, $a1, $a2	#add to a1, which holds the sum of the previous squared numbers
+	add	$t7, $t7, $t1	#move through array
+	j 	variance
+	
+
+continue:	#prints the current data, then goes to display graph
+	li	$v0, 4
+	la	$a0, vartxt
+	syscall
+	div	$a0, $a1, $t5
+	li	$v0, 1
+	syscall
+	li	$t4, 20
+	li	$a2, 0
+	li	$v0, 4
+	la	$a0, graphtxt
+	syscall
+	j	graph
+terminate:	#display completion message, halt program
+	li	$v0, 4
+	la	$a0, completion
+	syscall
+	li	$v0, 10
+	syscall

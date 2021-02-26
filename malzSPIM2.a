@@ -1,0 +1,173 @@
+#Name: Benjamin Malz
+#Filename: malzSPIM2.a
+#Purpose: This program will calculate the costs of a mortgage loan based off the initial loan, years and interest rate.
+#Input: The user inputs their initial loan amount, the number of years they will pay interest, and the interest rate. After the calculations are complete, they input a character to determine whether or not to repeat the process.
+#Output: The program will output the monthly, yearly and total payments, as well as the total interest paid. Users can repeat the process as many times as they want.
+#-------------------------------------------------------------------
+	.data
+newline:	.asciiz "\n"
+welcome:	.asciiz "Welcome to the Smells Fargo mortgage calculator! \n"
+loanprompt:	.asciiz "To start, please enter your initial loan amount. \n"
+yearprompt:	.asciiz	"How many years will you pay interest on this loan? \n"
+interestprompt:	.asciiz "What is the interest rate on your loan? \n"
+endmessage:	.asciiz	"\n\nThanks for choosing Smells Fargo, the most trusted name in business. \n"
+repeatmsg:	.asciiz "\n\nDo you want to calculate another mortgage? Press Y to calculate another. \n"
+monthlymsg:	.asciiz "\nYour monthly payment is: "
+yearlymsg:	.asciiz "\nYour annual payment is: "
+totalmsg:	.asciiz "\nTotal interest paid is: "
+overallmsg:	.asciiz "\nThe total of all payments is: "
+decimal:	.asciiz "."
+money:	.asciiz "$"
+#--------------------------------------------------------------------
+	.text
+	.globl main
+main:	
+	li.s	$f29, 1.0	#variable for 1
+	li.s	$f30, 100.0 #variable for 100, will be used for many things
+	li.s	$f31, 12.0	#variable for months in float
+	li.s	$f28, 0.5
+	li	$s0, 12	#variable for months
+	li	$s1, 1	#loop increment variable
+	li	$s2, 100 #int 100 variable
+	li	$s3, 'Y'
+	li	$s4, 'y'
+
+	li	$v0, 4
+	la	$a0, welcome
+	syscall	#display welcome message
+#CALLING INPUT PROCEDURE
+	jal	intake
+	mov.s	$f16, $f1	#move loan amount to a non-return register
+	move	$t0, $v1	#move total years to a non-return register
+	mov.s	$f17, $f2	#move interest to non-return register
+	div.s	$f18, $f17, $f30	#divide interest by 100 to get interest into math format
+	div.s	$f20, $f18, $f31	#monthly interest rate in $f20
+	mul	$t1, $t0, $s0	#total amount of payments (years multiplied by 12)
+	mtc1	$t1, $f19
+	cvt.s.w	$f19, $f19	#convert total months to float for math
+	add.s	$f21, $f20, $f29	# (1+r) part of formula
+	li	$t2, 1	#loop counter for exponent multiplier (assume one exponentiation already done)
+	mov.s	$f22, $f21	#result of one exponentiation (x^1)
+	
+powerloop: #exponentiates
+	bge	$t2, $t1, afterpower
+	mul.s	$f22, $f22, $f21	#another exponentiation
+	add	$t2, $t2, $s1
+	j	powerloop
+	
+afterpower:
+	#monthly interest math
+	mul.s	$f23, $f22, $f20
+	sub.s	$f24, $f22, $f29
+	div.s	$f24, $f23, $f24
+	mul.s	$f24, $f24, $f16
+	#end monthly interest math	
+
+	mul.s	$f24, $f24, $f30 #multiply monthly by 100 for later conversion
+	add.s	$f24, $f24, $f28 #add 0.5 for rounding	
+	mul.s	$f25, $f24, $f31 #yearly payment calculation
+	mtc1	$t0, $f17	#convert year length of loan to float
+	cvt.s.w	$f17, $f17
+	mul.s	$f17, $f17, $f25	#multiply yearly payment by years
+	mul.s	$f16, $f16, $f30	#multiply by 100 for rounding
+	sub.s	$f18, $f17, $f16	#subtract initial loan from total payments
+
+	#sending the results to be formatted and printed
+	li	$v0, 4
+	la	$a0, monthlymsg
+	syscall	
+	mov.s	$f13, $f24
+	jal	printer
+
+	li	$v0, 4
+	la	$a0, yearlymsg
+	syscall	
+	mov.s	$f13, $f25
+	jal	printer
+
+	li	$v0, 4
+	la	$a0, totalmsg
+	syscall	
+	mov.s	$f13, $f18
+	jal	printer
+
+	li	$v0, 4
+	la	$a0, overallmsg
+	syscall	
+	mov.s	$f13, $f17
+	jal	printer
+	
+	li	$v0, 4
+	la	$a0, repeatmsg
+	syscall
+	li	$v0, 12	#get character input
+	syscall
+	move	$t6, $v0
+	li	$v0, 4
+	la	$a0, newline
+	syscall
+	beq	$s3, $t6, main	#if input matches Y or y, repeat the program
+	beq	$s4, $t6, main
+	
+	
+end:
+	li	$v0, 4
+	la	$a0, endmessage
+	syscall	#goodbye!
+
+	li	$v0, 10	#quit program
+	syscall
+
+#---------------------------------------------------------------------
+
+#Input procedure
+	.text
+intake:	#takes input for the loan, length and interest rates and returns them in $f1, $v1 and $f2 respectively
+	li	$v0, 4
+	la	$a0, loanprompt
+	syscall	#asking for loan amount
+
+	li	$v0, 6
+	syscall
+	mov.s	$f1, $f0 	#loan amount will be in $f1 for return
+
+	li	$v0, 4
+	la	$a0, yearprompt
+	syscall	#asking for year length
+
+	li	$v0, 5
+	syscall
+	move	$v1, $v0 	#years will be in $v1 for return
+	
+	li	$v0, 4
+	la	$a0, interestprompt
+	syscall		#asking for interest rate
+
+	li	$v0, 6
+	syscall
+	mov.s	$f2, $f0 	#interest will be in $f2 for return
+
+	jr	$ra	#return
+
+printer:	#converts the multiplied number, stored in $f13 into its dollar value
+	cvt.w.s	$f13, $f13
+	mfc1	$t7, $f13 #convert float to integer
+	div	$t7, $s2 #divide by 100
+	li	$v0, 4
+	la	$a0, money #print dollar sign
+	syscall
+	
+	mflo	$a0
+	li	$v0, 1 #print quotient
+	syscall
+
+	li	$v0, 4
+	la	$a0, decimal #print decimal
+	syscall
+	
+	mfhi	$a0
+	li	$v0, 1 #print remainder
+	syscall
+
+	jr	$ra #return
+	

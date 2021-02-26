@@ -1,0 +1,139 @@
+#Name: Benjamin Malz
+#Filename: malzSPIM3.a
+#Purpose: This program will move n disks from peg A to peg B in the Tower of Hanoi puzzle, where n is a user input number. It does this recursively, in the minimum number of moves needed.
+#Input: The user inputs the number of disks. If the number of disks is less than 1, they must input another number. This repeats until the user inputs an acceptable number.
+#Output: The program will output a step-by-step list of every disk movement needed to get the entire stack of disks from peg A to peg B. After displaying this list, the total number of moves is displayed as well.
+#-------------------------------------------------------------------
+	.data
+newline:	.asciiz "\n"
+prompt:	.asciiz	"How many disks are there?\n"
+retry:	.asciiz	"\nYou have to have at least one disk! Try again. \n"
+moving:	.asciiz	"Move "
+dest:	.asciiz " to "
+result:	.asciiz "\nTotal moves: "
+#--------------------------------------------------------------------
+	.text
+	.globl main
+main:	
+	li	$t0, 1		#input comparison
+	li	$s0, 'A'
+	li	$s1, 'B'
+	li	$s2, 'C'	#variables for peg names
+	
+	li	$v0, 4
+	la	$a0, prompt
+	syscall
+	li	$v0, 5
+	syscall			#prompting for number of disks
+
+	blt	$v0, $t0, badinput	#if input is less than 1, jump to badinput	
+
+	move	$a3, $v0
+	move	$a0, $s0
+	move	$a1, $s1
+	move	$a2, $s2	#arguments for hanoi procedure
+
+	jal	hanoi		#the single procedure call, will recursively call itself
+
+	move	$t7, $v1	#move total moves to t7
+	li	$v0, 4
+	la	$a0, result
+	syscall
+	move	$a0, $t7
+	li	$v0, 1		#display the total number of moves
+	syscall
+	
+terminator:
+	li	$v0, 10		#exit the program
+	syscall
+
+badinput:			#jump here if the input is below 1
+	li	$v0, 4
+	la	$a0, retry
+	syscall
+	j	main		#restart program
+
+#-------------------------------------------------------------------
+#Procedure
+
+hanoi:	#(a0 = peg A, a1 = peg B, a2 = peg C, a3 = number of disks)
+	#Recursively calls itself until the disks are on the final peg in the correct order
+	
+	subu	$sp, $sp, 64	#frame storage
+	sw	$ra, 20($sp)	#store return add
+	sw	$fp, 16($sp)	#store frame pointer
+	addu	$fp, $sp, 28	#reset frame pointer
+	sw	$a0, 0($sp)	#store argument 1 at 0
+	sw	$a1, 4($sp)	#store argument 2 at 4
+	sw	$a2, 8($sp)	#store argument 3 at 8
+	sw	$a3, 12($sp)	#store argument 4 at 12
+	li	$t0, 1		#for comparison purposes
+	li	$t1, 0  	#recursive counter - the deepest recursive call will return either 1 or 0
+	sw	$t1, 60($sp)    #conserve counter
+	beq	$t0, $a3, printer #prevent further recursive calls if 1 disk, print move
+	
+	#call towers with (n-1, source, space, destination) (A, C, B)
+	lw	$a3, 12($sp)	#loading parameters for the recursive call
+	sub	$a3, $a3, $t0	#subtracting 1 from n
+	lw	$a0, 0($sp)
+	lw	$a1, 8($sp)
+	lw	$a2, 4($sp)
+	jal	hanoi		#recursive call
+	lw	$t1, 60($sp) 	#load counter
+	add	$t1, $t1, $v1	#add result
+	sw	$t1, 60($sp)	#store again
+
+	#call towers with (1, source, destination, space) (A, B, C)
+	li	$a3, 1		#set disks to 1
+	lw	$a0, 0($sp)	#load parameters for recursive call
+	lw	$a1, 4($sp)
+	lw	$a2, 8($sp)
+	jal	hanoi		#recursive call
+	lw	$t1, 60($sp) 	#load counter
+	add	$t1, $t1, $v1 	#add result
+	sw	$t1, 60($sp) 	#store again
+	
+
+	#call towers with (n-1, space, destination, source) (C, B, A)
+	lw	$a3, 12($sp)	#setting up parameters for recursive call
+	sub	$a3, $a3, $t0
+	lw	$a0, 8($sp)
+	lw	$a1, 4($sp)
+	lw	$a2, 0($sp)
+	jal	hanoi		#recursive call
+	lw	$t1, 60($sp) 	#load counter
+	add	$t1, $t1, $v1 	#add result
+	sw	$t1, 60($sp) 	#store again
+
+	lw	$ra, 20($sp)
+	lw	$fp, 16($sp)
+	lw	$v1, 60($sp) 	#return counter in v1
+	addu	$sp, $sp, 64
+	jr	$ra		#
+
+
+
+printer:			#jump here when n = 1, print movement
+	li	$v0, 4
+	la	$a0, moving
+	syscall
+	lw	$a0, 0($sp)	#load peg 1
+	li	$v0, 11		#print peg
+	syscall
+	li	$v0, 4
+	la	$a0, dest
+	syscall
+	lw	$a0, 4($sp)	#load peg 2
+	li	$v0, 11		#print peg
+	syscall
+	li	$v0, 4
+	la	$a0, newline
+	syscall
+	lw	$ra, 20($sp)	#load relevant information
+	lw	$fp, 16($sp)
+	lw	$v1, 60($sp)
+	addu	$sp, $sp, 64
+	addi	$v1, $v1, 1 	#add one to count, return it in v1
+	jr	$ra		#exit procedure
+	
+	
